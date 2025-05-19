@@ -22,8 +22,9 @@ jobs:
         dotnet-version: 9.0.x
     - name: Restore dependencies
       working-directory: ChatPLC_Backend
-      run: dotnet restore ChatPLC_Backend.csproj
+      run: dotnet restore
     - name: Build
-      run: dotnet build --no-restore
+      working-directory: ChatPLC_Backend
+      run: dotnet build --no-restore 
     - name: Test
       run: dotnet test --no-build --verbosity normal
