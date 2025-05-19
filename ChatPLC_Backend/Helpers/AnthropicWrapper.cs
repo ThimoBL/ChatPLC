@@ -27,7 +27,7 @@ public class AnthropicWrapper : IAnthropicWrapper
             { "anthropic-version", "2023-06-01" },
             {
                 "x-api-key",
-                _configuration.GetSection("ASPNETCORE_ANTHROPIC_API_KEY").Value ?? ""
+                Environment.GetEnvironmentVariable("ASPNETCORE_ANTHROPIC_API_KEY") ?? ""
             }
         };
     }

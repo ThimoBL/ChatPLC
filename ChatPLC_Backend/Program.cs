@@ -11,6 +11,8 @@ namespace ChatPLC_Backend
     {
         public static void Main(string[] args)
         {
+            DotNetEnv.Env.Load();
+
             var builder = WebApplication.CreateBuilder(args);
 
             // builder.Services.AddCors(options =>
@@ -50,7 +52,7 @@ namespace ChatPLC_Backend
             {
                 client.BaseAddress = new Uri("https://api.anthropic.com/v1/");
             });
-            // builder.Services.AddScoped<IRagWrapper, RagWrapper>();
+
             builder.Services.AddScoped<IQuestionService, QuestionService>();
             builder.Services.AddLogging(config =>
             {
