@@ -22,6 +22,7 @@ jobs:
         dotnet-version: 8.0.x
     - name: Restore dependencies
       run: dotnet restore ./ChatPLC_Backend
+      working-directory: ChatPLC
     - name: Build
       run: dotnet build --no-restore
     - name: Test
