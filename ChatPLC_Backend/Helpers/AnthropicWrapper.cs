@@ -7,24 +7,29 @@ namespace ChatPLC_Backend.Helpers;
 
 public class AnthropicWrapper : IAnthropicWrapper
 {
+    private readonly IConfiguration _configuration;
     private readonly ILogger<AnthropicWrapper> _logger;
     private readonly HttpClient _httpClient;
 
     private const int MaxTokens = 15000;
 
-    private readonly Dictionary<string, string> _apiHeader = new()
-    {
-        { "anthropic-version", "2023-06-01" },
-        {
-            "x-api-key",
-            "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"
-        }
-    };
+    private readonly Dictionary<string, string> _apiHeader;
 
-    public AnthropicWrapper(ILogger<AnthropicWrapper> logger, HttpClient httpClient)
+    public AnthropicWrapper(ILogger<AnthropicWrapper> logger, HttpClient httpClient, IConfiguration configuration)
     {
         _logger = logger;
         _httpClient = httpClient;
+        _configuration = configuration;
+        
+        // Initialize the API headers
+        _apiHeader = new()
+        {
+            { "anthropic-version", "2023-06-01" },
+            {
+                "x-api-key",
+                _configuration.GetSection("ASPNETCORE_ANTHROPIC_API_KEY").Value ?? ""
+            }
+        };
     }
 
     public async IAsyncEnumerable<string> StreamResponseAsync(string question, List<AnthropicApiExample>? examples,
