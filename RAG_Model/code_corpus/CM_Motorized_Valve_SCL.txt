@@ -1,0 +1,256 @@
+// This Structured Control Language (SCL) block controls a motorized valve's behavior
+// including simulation, mode control, alarm handling, and state transitions.
+
+REGION INPUT 
+  //Decide to read inputs or simulate inputs
+  IF #io_comm.STS.InSimulation THEN
+    //Simulate input
+    REGION Simulation
+      #tInFailure := true;
+      
+      //timer for simulating IsClosed input
+      "SIMClosingTimer".TON(IN := (#sState = #cClosingState),
+                 PT := T#3s,
+                 Q => #tIsClosed,
+                 ET => #tSimTimerETIsClosed);
+      
+      //timer for simulating IsOpen input
+      "SIMOpeningTimer".TON(IN:=(#sState = #cOpeningState),
+                  PT:=T#3s,
+                  Q=>#tIsOpen,
+                  ET=>#tSimTimerETIsOpen);
+      
+      IF #sState = #cOpenState THEN
+        #tIsOpen := TRUE;
+      ELSIF #sState = #cClosedState THEN
+        #tIsClosed := TRUE;
+      END_IF;
+    END_REGION
+  ELSE
+    //get actual input
+    #tIsClosed := #iIsClosed;
+    #tIsOpen := #iIsOpen;
+    #tInFailure := #iFailure;
+  END_IF;
+END_REGION
+
+REGION HMI
+  //Make sure to handle input from HMI and HMI input is same for whole program
+  #tHMI := #io_comm.HMI;
+  #io_comm.HMI := #TEmptyHMI;
+END_REGION
+
+REGION Mode definition
+  //Define operation mode based on input
+  //Prioritize CS singals over HMI signals
+  IF #io_comm.CS.Auto OR #io_comm.CS.Manual OR #tHMI.Auto OR #tHMI.Manual THEN
+    #io_comm.STS.InAuto := #io_comm.CS.Auto OR (NOT #io_comm.CS.Manual AND #tHMI.Auto);
+    #io_comm.STS.InManual := NOT #io_comm.STS.InAuto;
+  END_IF;
+  
+  IF #io_comm.CS.Simulation_On OR #tHMI.Simulation_On THEN
+    #io_comm.STS.InSimulation := TRUE;
+  ELSIF #io_comm.CS.Simulation_Off OR #tHMI.Simulation_Off THEN
+    #io_comm.STS.InSimulation := FALSE;
+  END_IF;
+END_REGION
+
+REGION Alarm logic
+  //reset all alarms
+  IF #tHMI.Reset OR #io_comm.CS.Reset THEN
+    #io_comm.ALM.CloseTimeout := false;
+    #io_comm.ALM.OpenTimeout := false;
+    #io_comm.ALM.NotClosed := false;
+    #io_comm.ALM.NotOpen := false;
+    #io_comm.ALM.Failure := false;
+    #io_comm.STS.Alarmtxt := 0;
+  END_IF;
+  
+  IF NOT #tInFailure THEN
+    #io_comm.ALM.Failure := True;
+  END_IF;
+END_REGION
+
+REGION States
+  REGION State transitions
+    CASE #sState OF
+      #cClosingState:
+        REGION Closing
+          //check io for transition to closed
+          IF #tIsClosed THEN
+            #sState := #cClosedState;
+          END_IF;
+          //check io for transition to opening
+          IF NOT #io_comm.STS.InAlarm AND
+            NOT #io_comm.CS.Interlock AND
+            ((#io_comm.STS.InAuto AND #io_comm.CS.Open) OR (#io_comm.STS.InManual AND #tHMI.Open)) THEN
+            #sState := #cOpeningState;
+          END_IF;
+        END_REGION
+      #cClosedState:
+        REGION Closed
+          //check io for transition to opening
+          IF NOT #io_comm.STS.InAlarm AND
+            NOT #io_comm.CS.Interlock AND
+            ((#io_comm.STS.InAuto AND #io_comm.CS.Open) OR (#io_comm.STS.InManual AND #tHMI.Open)) THEN
+            #sState := #cOpeningState;
+          END_IF;
+        END_REGION
+      #cOpeningState:
+        REGION Opening
+          //check io for transition to open
+          IF #tIsOpen THEN
+            #sState := #cOpenState;
+          END_IF;
+          //check io for transition to closing
+          IF #io_comm.STS.InAlarm OR
+            #io_comm.CS.Interlock OR
+            ((#io_comm.STS.InAuto AND #io_comm.CS.Close AND NOT #io_comm.CS.Open) OR (#io_comm.STS.InManual AND 
+#tHMI.Close AND NOT #tHMI.Open)) THEN
+            #sState := #cClosingState;
+          END_IF;
+        END_REGION
+      #cOpenState:
+        REGION Open
+          //check io for transition to closing
+          IF #io_comm.STS.InAlarm OR
+            #io_comm.CS.Interlock OR
+            ((#io_comm.STS.InAuto AND #io_comm.CS.Close AND NOT #io_comm.CS.Open)
+            OR (#io_comm.STS.InManual AND #tHMI.Close AND NOT #tHMI.Open)) THEN
+            #sState := #cClosingState;
+          END_IF;
+        END_REGION
+      ELSE
+        //Undefinied state, go to closing state
+        #sState := #cClosingState;
+    END_CASE;
+  END_REGION
+  REGION State Actions
+    CASE #sState OF
+      #cClosingState:
+        REGION Closing 
+          #io_comm.STS.Statetxt := #sState;
+          
+          //reset timers
+          "OpeningTimer".TON(IN := FALSE,
+                     PT := #io_comm.PAR.MaxTravelTime,
+                     Q => #tTimerOutOpening,
+                     ET => #tTimerETOpening);
+          "OpenedOffDelay".TOF(IN := (#sState = #cOpenState AND #tIsOpen),
+                     PT := #io_comm.PAR.OutOfPositionDelay,
+                     Q => #tTimerOutOpenPos,
+                     ET => #tTimerETOpenPos);
+          
+          //Timer for checking closing time violation 
+          "ClosingTimer".TON(IN := (#sState = #cClosingState),
+                     PT := #io_comm.PAR.MaxTravelTime,
+                     Q => #tTimerOutClosing,
+                     ET => #tTimerETClosing);
+          
+          //check if alarm should be set
+          IF #tTimerOutClosing THEN
+            #io_comm.ALM.CloseTimeout := TRUE;
+            #io_comm.STS.Alarmtxt := 1;
+          END_IF;
+        END_REGION
+      #cClosedState:
+        REGION Closed
+          #io_comm.STS.Statetxt := #sState;
+          
+          //reset timer
+          "ClosingTimer".TON(IN := FALSE,
+                     PT := #io_comm.PAR.MaxTravelTime,
+                     Q => #tTimerOutClosing,
+                     ET => #tTimerETClosing);
+          
+          //Timer for checking closed valve position violation
+          "ClosedOffDelay".TOF(IN := (#sState = #cClosedState AND #tIsClosed),
+                     PT := #io_comm.PAR.OutOfPositionDelay,
+                     Q => #tTimerOutClosedPos,
+                     ET => #tTimerETClosedPos);
+          
+          //check if alarm should be set
+          IF NOT #tTimerOutClosedPos THEN
+            #io_comm.ALM.NotClosed := TRUE;
+            #io_comm.STS.Alarmtxt := 2;
+          END_IF;
+        END_REGION
+      #cOpeningState:
+        REGION Opening
+          #io_comm.STS.Statetxt := #sState;
+          
+          //reset timers
+          "ClosingTimer".TON(IN := FALSE,
+                     PT := #io_comm.PAR.MaxTravelTime,
+                     Q => #tTimerOutClosing,
+                     ET => #tTimerETClosing);
+          "ClosedOffDelay".TOF(IN := FALSE,
+                     PT := #io_comm.PAR.OutOfPositionDelay,
+                     Q => #tTimerOutClosedPos,
+                     ET => #tTimerETClosedPos);
+          
+          
+          //Timer for checking opening time violation
+          "OpeningTimer".TON(IN := (#sState = #cOpeningState),
+                     PT := #io_comm.PAR.MaxTravelTime,
+                     Q => #tTimerOutOpening,
+                     ET => #tTimerETOpening);
+          
+          //check if alarm should be set
+          IF #tTimerOutOpening THEN
+            #io_comm.ALM.OpenTimeout := TRUE;
+            #io_comm.STS.Alarmtxt := 3;
+            #sState := #cClosingState;
+            
+            //reset timer
+            "OpeningTimer".TON(IN := FALSE,
+                       PT := #io_comm.PAR.MaxTravelTime,
+                       Q => #tTimerOutOpening,
+                       ET => #tTimerETOpening);
+          END_IF;
+        END_REGION
+      #cOpenState:
+        REGION Open
+          #io_comm.STS.Statetxt := #sState;
+          
+          //reseting timer
+          "OpeningTimer".TON(IN := (#sState = #cOpeningState),
+                     PT := #io_comm.PAR.MaxTravelTime,
+                     Q => #tTimerOutOpening,
+                     ET => #tTimerETOpening);
+          
+          //Timer for checking open valve position violation
+          "OpenedOffDelay".TOF(IN := (#sState = #cOpenState AND #tIsOpen),
+                     PT := #io_comm.PAR.OutOfPositionDelay,
+                     Q => #tTimerOutOpenPos,
+                     ET => #tTimerETOpenPos);
+          
+          //check if alarm should be set
+          IF NOT #tTimerOutOpenPos THEN
+            #io_comm.ALM.NotOpen := TRUE;
+            #io_comm.STS.Alarmtxt := 4;
+            #sState := #cClosingState;
+          END_IF;
+        END_REGION
+    END_CASE;
+  END_REGION
+END_REGION
+
+REGION Status
+  //set status according to alarms/state
+  #io_comm.STS.InAlarm := (#io_comm.ALM.CloseTimeout
+  OR #io_comm.ALM.Failure
+  OR #io_comm.ALM.NotClosed
+  OR #io_comm.ALM.NotOpen
+  OR #io_comm.ALM.OpenTimeout);
+  #io_comm.STS.IsOpening := (#sState = #cOpeningState);
+  #io_comm.STS.IsOpened := (#sState = #cOpenState);
+  #io_comm.STS.IsClosing := (#sState = #cClosingState);
+  #io_comm.STS.IsClosed := (#sState = #cClosedState);
+  #io_comm.STS.IsInterlocked := #io_comm.CS.Interlock;
+END_REGION
+
+REGION Output
+  //set output according to state and status
+  #oOpen := #sState = #cOpeningState OR #sState = #cOpenState;
+END_REGION 

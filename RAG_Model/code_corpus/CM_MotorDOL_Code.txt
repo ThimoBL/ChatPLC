@@ -1,0 +1,196 @@
+// This function block manages a Direct-On-Line (DOL) motor control.
+// It handles alarms, simulation, state transitions, and output control based on inputs and statuses.
+
+
+//************************** Inputs **************************
+//
+IF #io_com.STS.InSimulation = TRUE THEN
+
+  CASE #io_com.STS.State_INT OF
+    0:
+      #t_Running := FALSE;
+    10:
+      #t_Running := TRUE;
+    20:
+      #t_Running := TRUE;
+    30:
+      #t_Running := FALSE;
+  END_CASE;
+
+  #t_Thermal := TRUE;
+  #t_Isolated := TRUE;
+
+ELSE
+  #t_Running := #i_Running;
+  #t_Thermal := #i_Thermal;
+  #t_Isolated := #i_Isolated;
+END_IF;
+
+//************************** Alarms **************************
+//
+// Starting/Stopping Failed Timers
+#AlmTmr_Starting(IN := #io_com.STS.Starting,
+         PT := #io_com.PAR.AlmStartTmr);
+#AlmTmr_Stopping(IN := #io_com.STS.Stopping,
+         PT := #io_com.PAR.AlmStopTmr);
+
+// Reset Alarms
+IF #io_com.CS.Reset OR #io_com.HMI.Reset THEN
+  #io_com.ALM.Isolated := FALSE;
+  #io_com.ALM.Thermal := FALSE;
+  #io_com.ALM.NotStarted := FALSE;
+  #io_com.ALM.NotStopped := FALSE;
+END_IF;
+
+IF #io_com.STS.InSimulation = FALSE THEN
+  // Thermal Alarm
+  IF #t_Thermal = FALSE THEN
+    #io_com.ALM.Thermal := TRUE;
+  END_IF;
+  // Isolated Alarm
+  IF #t_Isolated = FALSE THEN
+    #io_com.ALM.Isolated := TRUE;
+  END_IF;
+  // Starting Alarm
+  IF #AlmTmr_Starting.Q = TRUE THEN
+    #io_com.ALM.NotStarted := TRUE;
+  END_IF;
+  // Stopping Alarm
+  IF #AlmTmr_Stopping.Q = TRUE THEN
+    #io_com.ALM.NotStopped := TRUE;
+  END_IF;
+END_IF;
+
+// Set Alarm Word
+"FC_BoolToWord"(Bit0 := #io_com.ALM.Isolated,
+        Bit1 := #io_com.ALM.NotStarted,
+        Bit2 := #io_com.ALM.NotStopped,
+        Bit3 := #io_com.ALM.Thermal,
+        Bit4 := FALSE,
+        Bit5 := FALSE,
+        Bit6 := FALSE,
+        Bit7 := FALSE,
+        Bit8 := FALSE,
+        Bit9 := FALSE,
+        Bit10 := FALSE,
+        Bit11 := FALSE,
+        Bit12 := FALSE,
+        Bit13 := FALSE,
+        Bit14 := FALSE,
+        Bit15 := FALSE,
+        "Word" => #io_com.ALM.AlarmWord);
+
+
+// ************************** States **************************
+// 
+#io_com.STS.IO.i_Running := #t_Running;
+#io_com.STS.IO.i_Isolated := #t_Isolated;
+#io_com.STS.IO.i_Thermal := #t_Thermal;
+
+// InAuto init
+IF (#io_com.STS.InAuto = FALSE AND #io_com.STS.InManual = FALSE) THEN
+  #io_com.STS.InAuto := TRUE;
+  #io_com.STS.InManual := FALSE;
+END_IF;
+
+// InAuto 
+IF (#io_com.CS.Auto OR #io_com.HMI.Auto) THEN
+  #io_com.STS.InAuto := TRUE;
+  #io_com.STS.InManual := FALSE;
+END_IF;
+
+// InManual
+IF (#io_com.CS.Manual OR #io_com.HMI.Manual) THEN
+  #io_com.STS.InAuto := FALSE;
+  #io_com.STS.InManual := TRUE;
+END_IF;
+
+// InSimulation
+IF ((#io_com.CS.Simulation_On AND #io_com.STS.InAuto) OR #io_com.HMI.Simulation_On) THEN
+  #io_com.STS.InSimulation := TRUE;
+END_IF;
+
+IF ((#io_com.CS.Simulation_Off AND #io_com.STS.InAuto) OR #io_com.HMI.Simulation_Off) THEN
+  #io_com.STS.InSimulation := FALSE;
+END_IF;
+
+// Interlocked
+#io_com.STS.Interlocked := #io_com.CS.Interlock;
+
+// InAlarm
+IF #io_com.ALM.Isolated OR #io_com.ALM.NotStarted OR #io_com.ALM.NotStopped OR #io_com.ALM.Thermal THEN
+  #io_com.STS.InAlarm := TRUE;
+ELSE
+  #io_com.STS.InAlarm := FALSE;
+END_IF;
+
+// Set state booleans based on INT state value
+CASE #io_com.STS.State_INT OF
+  0: //Off
+    #io_com.STS.Off := TRUE;
+    #io_com.STS.On := FALSE;
+    #io_com.STS.Starting := FALSE;
+    #io_com.STS.Stopping := FALSE;
+  10: //Starting
+    #io_com.STS.Off := FALSE;
+    #io_com.STS.On := FALSE;
+    #io_com.STS.Starting := TRUE;
+    #io_com.STS.Stopping := FALSE;
+  20: //On
+    #io_com.STS.Off := FALSE;
+    #io_com.STS.On := TRUE;
+    #io_com.STS.Starting := FALSE;
+    #io_com.STS.Stopping := FALSE;
+  30: //Stopping
+    #io_com.STS.Off := FALSE;
+    #io_com.STS.On := FALSE;
+    #io_com.STS.Starting := FALSE;
+    #io_com.STS.Stopping := TRUE;
+  ELSE
+    #io_com.STS.State_INT := 0;
+END_CASE;
+
+// ************************** State Transitions ************************** 
+// 
+CASE #io_com.STS.State_INT OF
+  0: //Off
+    IF (((#io_com.CS.On AND #io_com.STS.InAuto) OR (#io_com.HMI.On AND #io_com.STS.InManual)) AND #io_com.STS.Interlocked = FALSE AND #io_com.STS.InAlarm = FALSE) THEN
+      #io_com.STS.State_INT := 10;
+    END_IF;
+  10: //Starting
+    IF #t_Running THEN
+      #io_com.STS.State_INT := 20;
+    ELSIF (((#io_com.CS.On = FALSE AND #io_com.STS.InAuto) OR (#io_com.HMI.Off AND #io_com.STS.InManual)) OR #io_com.STS.Interlocked = TRUE) THEN
+      #io_com.STS.State_INT := 30;
+    END_IF;
+  20: //On
+    IF (((#io_com.CS.On = FALSE AND #io_com.STS.InAuto) OR (#io_com.HMI.Off AND #io_com.STS.InManual)) OR #io_com.STS.Interlocked = TRUE) THEN
+      #io_com.STS.State_INT := 30;
+    END_IF;
+  30: //Stopping
+    IF #t_Running = FALSE THEN
+      #io_com.STS.State_INT := 0;
+    END_IF;
+  ELSE
+    #io_com.STS.State_INT := 0;
+END_CASE;
+
+// ************************** Output ************************** 
+// 
+IF #io_com.STS.State_INT = 10 OR #io_com.STS.State_INT = 20 THEN
+  #o_On := TRUE;
+  #io_com.STS.IO.o_On := TRUE;
+ELSE
+  #o_On := FALSE;
+  #io_com.STS.IO.o_On := FALSE;
+END_IF;
+
+//***************Reset HMI Control signals********************
+// 
+#io_com.HMI.Auto := FALSE;
+#io_com.HMI.Manual := FALSE;
+#io_com.HMI.Off := FALSE;
+#io_com.HMI.On := FALSE;
+#io_com.HMI.Reset := FALSE;
+#io_com.HMI.Simulation_On := FALSE;
+#io_com.HMI.Simulation_Off := FALSE;

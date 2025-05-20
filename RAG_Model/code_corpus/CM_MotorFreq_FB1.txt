@@ -1,0 +1,205 @@
+// This Function Block (FB1) controls a motor using simulation or real inputs, switching between Auto, Manual, or Simulation modes.
+// It manages state transitions, setpoint conversion, output commands, and alarm/status monitoring for industrial automation.
+
+REGION INPUT
+  //Decide to read inputs or simulate inputs
+  IF #io_comm.STS.InSimulation THEN
+    //Simulate input
+    //timer for simulating i_Running input during starting 
+    "SimStartTimer".TON(IN:=#io_comm.STS.Starting,
+                        PT:=T#3s,
+                        Q=>#tStartTimerQ);
+    //timer for simulating i_Running input during stopping 
+    "SimStoppingTimer".TON(IN:=#io_comm.STS.Stopping,
+                           PT:=T#3s,
+                           Q=>#tStopTimerQ);
+
+    IF #io_comm.STS.Starting THEN
+      #io_comm.IO.i_Running := #tStartTimerQ;
+    ELSIF #io_comm.STS.Stopping THEN
+      #io_comm.IO.i_Running := NOT #tStopTimerQ;
+    END_IF;
+
+    //set simulation values
+    IF #io_comm.IO.i_Running THEN
+      #io_comm.IO.i_ActSpeed := #io_comm.IO.o_SetPoint;
+    ELSE
+      #io_comm.IO.i_ActSpeed := 6000;
+    END_IF;
+
+    #io_comm.IO.i_Isolated := TRUE;
+    #io_comm.IO.i_Thermal := TRUE;
+
+  ELSE
+    //set actual input
+    #io_comm.IO.i_ActSpeed := #i_ActSpeed;
+    #io_comm.IO.i_Isolated := #i_Isolated;
+    #io_comm.IO.i_Thermal := #i_Thermal;
+    #io_comm.IO.i_Running := #i_Running;
+  END_IF;
+
+  //convert ActualSpeed output from Modbus to Hz
+  "AnalogConverter"(X_In := #io_comm.IO.i_ActSpeed,
+                    X_Min := #io_comm.PAR.ScaledMin,
+                    X_Max := #io_comm.PAR.ScaledMax,
+                    Y_Min := #io_comm.PAR.RawMin,
+                    Y_Max := #io_comm.PAR.RawMax,
+                    Y_Out => #tActSpeed);
+
+  #io_comm.STS.ActSpeed := #tActSpeed;
+  #io_comm.STS.Interlocked := #io_comm.CS.Interlock;
+  #o_Setpoint := 0;
+  #o_On := false;
+END_REGION
+
+REGION HMI
+  //keep the manual setpoint in HMI (better would be to put this value in PAR and not in HMI)
+  #sEmptyHMI.Setpoint := #io_comm.HMI.Setpoint;
+  #tHMI := #io_comm.HMI;
+  #io_comm.HMI := #sEmptyHMI;
+END_REGION
+
+REGION ALARM reset
+  IF #io_comm.CS.Reset OR #tHMI.Reset THEN
+    #io_comm.STS.InAlarm := false;
+    #io_comm.ALM.Isolated := false;
+    #io_comm.ALM.NotStarted := false;
+    #io_comm.ALM.NotStopped := false;
+    #io_comm.ALM.SpeedDifference := false;
+  END_IF;
+END_REGION
+
+REGION MODE DEFINITION
+  //Define operation mode based on input
+  //Prioritize CS signals over HMI signals
+  IF #io_comm.CS.Auto OR (#tHMI.Auto AND NOT #io_comm.CS.Manual) THEN
+    #io_comm.STS.InManual := FALSE;
+  ELSIF #io_comm.CS.Manual OR (#tHMI.Manual AND NOT #io_comm.CS.Auto) THEN
+    #io_comm.STS.InManual := TRUE;
+  END_IF;
+
+  #io_comm.STS.InAuto := NOT #io_comm.STS.InManual;
+
+  IF #io_comm.CS.Simulation_On OR #tHMI.Simulation_On THEN
+    #io_comm.STS.InSimulation := TRUE;
+  ELSIF #io_comm.CS.Simulation_Off OR #tHMI.Simulation_Off THEN
+    #io_comm.STS.InSimulation := FALSE;
+  END_IF;
+END_REGION
+
+REGION STATE TRANSITIONS
+  #tStoppingCondition :=
+    #io_comm.STS.InAlarm OR
+    #io_comm.STS.Interlocked OR
+    ((#io_comm.CS.Off AND NOT #io_comm.CS.On AND #io_comm.STS.InAuto) OR
+     (#tHMI.Off AND NOT #tHMI.On AND #io_comm.STS.InManual));
+
+  #tStartingCondition :=
+    NOT #io_comm.STS.InAlarm AND
+    NOT #io_comm.STS.Interlocked AND
+    ((#io_comm.CS.On AND NOT #io_comm.CS.Off AND #io_comm.STS.InAuto) OR
+     (#tHMI.On AND NOT #tHMI.Off AND #io_comm.STS.InManual));
+
+  #tOffCondition := NOT #io_comm.IO.i_Running;
+  #tOnCondition := #io_comm.IO.i_Running;
+
+  CASE #io_comm.STS.State OF
+    #cStarting:
+      IF #tOnCondition THEN
+        #io_comm.STS.State := #cOn;
+      END_IF;
+      IF #tStoppingCondition THEN
+        #io_comm.STS.State := #cStopping;
+      END_IF;
+    #cOn:
+      IF #tStoppingCondition THEN
+        #io_comm.STS.State := #cStopping;
+      END_IF;
+    #cStopping:
+      IF #tOffCondition THEN
+        #io_comm.STS.State := #cOff;
+      END_IF;
+      IF #tStartingCondition THEN
+        #io_comm.STS.State := #cStarting;
+      END_IF;
+    #cOff:
+      IF #tStartingCondition THEN
+        #io_comm.STS.State := #cStarting;
+      END_IF;
+    ELSE
+      #io_comm.STS.State := #cStopping;
+  END_CASE;
+END_REGION
+
+REGION Output
+  IF #io_comm.STS.InAuto THEN
+    #tSetPoint := #io_comm.CS.Setpoint;
+  ELSIF #io_comm.STS.InManual THEN
+    #tSetPoint := #tHMI.Setpoint;
+  END_IF;
+
+  "AnalogConverter"(X_In := #tSetPoint,
+                    X_Min := #io_comm.PAR.RawMin,
+                    X_Max := #io_comm.PAR.RawMax,
+                    Y_Min := #io_comm.PAR.ScaledMin,
+                    Y_Max := #io_comm.PAR.ScaledMax,
+                    Y_Out => #tSetPoint);
+  #o_Setpoint := ROUND_INT(#tSetPoint);
+  #o_On := (#io_comm.STS.State = #cStarting OR #io_comm.STS.State = #cOn);
+END_REGION
+
+REGION ALARM
+  "StoppingTimer".TON(IN := (#io_comm.IO.i_Running AND #io_comm.STS.State = #cStopping),
+                      PT := INT_TO_TIME(#io_comm.PAR.StoppingTimeout),
+                      Q => #tResult);
+  IF #tResult THEN
+    #io_comm.ALM.NotStopped := true;
+  END_IF;
+
+  "StartingTimer".TON(IN := (NOT #io_comm.IO.i_Running AND #io_comm.STS.State = #cStarting),
+                      PT := INT_TO_TIME(#io_comm.PAR.StartingTimeout),
+                      Q => #tResult);
+  IF #tResult THEN
+    #io_comm.ALM.NotStarted := true;
+  END_IF;
+
+  IF #io_comm.STS.InAuto THEN
+    #tSetPoint := #io_comm.CS.Setpoint;
+  ELSIF #io_comm.STS.InManual THEN
+    #tSetPoint := #tHMI.Setpoint;
+  END_IF;
+
+  #tSpeedDiffStart :=
+    (#io_comm.IO.i_Running AND (#io_comm.STS.ActSpeed > #tSetPoint + #io_comm.PAR.SpeedDifferenceTollerance)) OR
+    (#io_comm.IO.i_Running AND (#io_comm.STS.ActSpeed < #tSetPoint - #io_comm.PAR.SpeedDifferenceTollerance)) OR
+    ((NOT #io_comm.IO.i_Running AND (#io_comm.STS.ActSpeed > 0 + #io_comm.PAR.SpeedDifferenceTollerance)) OR
+     (NOT #io_comm.IO.i_Running AND (#io_comm.STS.ActSpeed < 0 - #io_comm.PAR.SpeedDifferenceTollerance)));
+
+  "SpeedDiffTimer".TON(IN := (#tSpeedDiffStart AND (#io_comm.STS.State = #cOn OR #io_comm.STS.State = #cOff)),
+                       PT := INT_TO_TIME(#io_comm.PAR.SpeedDifferenceTimeout),
+                       Q => #tResult);
+  IF #tResult THEN
+    #io_comm.ALM.SpeedDifference := true;
+  END_IF;
+
+  #io_comm.ALM.Thermal := NOT #io_comm.IO.i_Thermal;
+  #io_comm.ALM.Isolated := NOT #io_comm.IO.i_Isolated;
+
+  #io_comm.ALM.AlarmWord.%X0 := #io_comm.ALM.Thermal;
+  #io_comm.ALM.AlarmWord.%X1 := #io_comm.ALM.Isolated;
+  #io_comm.ALM.AlarmWord.%X2 := #io_comm.ALM.NotStarted;
+  #io_comm.ALM.AlarmWord.%X3 := #io_comm.ALM.NotStopped;
+  #io_comm.ALM.AlarmWord.%X4 := #io_comm.ALM.SpeedDifference;
+END_REGION
+
+REGION Status
+  #io_comm.STS.InAlarm := (#io_comm.ALM.Isolated OR #io_comm.ALM.NotStarted OR #io_comm.ALM.NotStopped OR #io_comm.ALM.SpeedDifference);
+  #io_comm.STS.Off := (#io_comm.STS.State = #cOff);
+  #io_comm.STS.On := (#io_comm.STS.State = #cOn);
+  #io_comm.STS.Starting := (#io_comm.STS.State = #cStarting);
+  #io_comm.STS.Stopping := (#io_comm.STS.State = #cStopping);
+  #io_comm.STS.Interlocked := #io_comm.CS.Interlock;
+
+  #io_comm.IO.o_SetPoint := #o_Setpoint;
+  #io_comm.IO.o_On := #o_On;
+END_REGION

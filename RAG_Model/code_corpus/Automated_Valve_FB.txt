@@ -1,0 +1,159 @@
+// This function block implements the control logic for an automated valve,
+// handling simulation, manual, and automatic operation modes, including HMI interactions and fault monitoring.
+
+REGION General
+REGION Copy HMI requests into local temps
+#t_HMI_Reset := #io_comm.HMI.Reset;
+#t_HMI_Open := #io_comm.HMI.Open;
+#t_HMI_Close := #io_comm.HMI.Close;
+#t_HMI_Auto_req := #io_comm.HMI.Auto_req;
+#t_HMI_Man_req := #io_comm.HMI.Man_req;
+#t_HMI_Sim_On_req := #io_comm.HMI.Sim_On_req;
+#t_HMI_Sim_Off_req := #io_comm.HMI.Sim_Off_req;
+END_REGION
+
+REGION Reset HMI request
+#io_comm.HMI.Reset := 0;
+#io_comm.HMI.Open := 0;
+#io_comm.HMI.Close := 0;
+#io_comm.HMI.Auto_req := 0;
+#io_comm.HMI.Man_req := 0;
+#io_comm.HMI.Sim_On_req := 0;
+#io_comm.HMI.Sim_Off_req := 0;
+END_REGION
+
+REGION Inputs in simulation
+IF #io_comm.STS.InSimulation THEN
+#t_IsOpen := #io_comm.STS.Opening OR #io_comm.STS.Open;
+#t_IsClosed := #io_comm.STS.Closing OR #io_comm.STS.Closed;
+#t_IsDriveOK := 1;
+ELSE
+#t_IsOpen := #FB_Open;
+#t_IsClosed := #FB_Close;
+#t_IsDriveOK := #Drive_OK;
+END_IF;
+END_REGION
+
+REGION Mode selection
+// Scenario for simulation mode
+IF (#io_comm.CS.Sim_On_req AND NOT #io_comm.CS.SIm_Off_req) OR (#t_HMI_Sim_On_req AND NOT #t_HMI_Sim_Off_req) THEN
+#io_comm.STS.InSimulation := 1;
+ELSIF #io_comm.CS.SIm_Off_req OR #t_HMI_Sim_Off_req THEN
+#io_comm.STS.InSimulation := 0;
+END_IF;
+
+// Specify scenarios where the valve operates in manual mode
+IF (#io_comm.CS.Man_req AND NOT #io_comm.CS.Auto_req) OR (#t_HMI_Man_req AND NOT #t_HMI_Auto_req) THEN
+#io_comm.STS.InManual := 1;
+ELSIF #io_comm.CS.Auto_req OR #t_HMI_Auto_req THEN
+#io_comm.STS.InManual := 0;
+END_IF;
+
+// Specify scenario where the valve operates in automatic mode
+#io_comm.STS.InAuto := NOT #io_comm.STS.InManual;
+END_REGION
+
+REGION Conditions for transitions
+// Delay to close request in auto
+#s_Tim_DelayCloseRequest(IN := (#io_comm.CS.Close AND #io_comm.STS.InAuto),
+PT := INT_TO_TIME(#io_comm.PAR.AUTO_CLOSE_del * 1000));
+
+// Close request valve
+#t_Close_req := #s_Tim_DelayCloseRequest.Q OR (#t_HMI_Close AND #io_comm.STS.InManual) OR #io_comm.CS.Interlock;
+
+// Delay to open request in auto
+#s_Tim_DelayOpenRequest(IN := (#io_comm.CS.Open AND #io_comm.STS.InAuto AND NOT #io_comm.CS.Interlock),
+PT := INT_TO_TIME(#io_comm.PAR.AUTO_OPEN_del * 1000));
+
+// Open request valve
+#t_Open_req := (#s_Tim_DelayOpenRequest.Q OR (#t_HMI_Open AND #io_comm.STS.InManual AND NOT #io_comm.CS.Interlock))
+AND NOT #t_Close_req;
+END_REGION
+
+REGION Coordination control
+REGION Define steps
+CASE #io_comm.STS.Step OF
+#c_closed:  // Valve is closed
+IF #t_Open_req THEN
+#io_comm.STS.Step := #c_opening;
+END_IF;
+
+#c_opening:  // Valve is opening
+IF #t_IsOpen THEN
+#io_comm.STS.Step := #c_open;
+ELSIF #t_Close_req THEN
+#io_comm.STS.Step := #c_closing;
+END_IF;
+
+#c_open:  // Valve is open
+IF #t_Close_req THEN
+#io_comm.STS.Step := #c_closing;
+END_IF;
+
+#c_closing:  // Valve is closing
+IF #t_IsClosed THEN
+#io_comm.STS.Step := #c_closed;
+ELSIF #t_Open_req THEN
+#io_comm.STS.Step := #c_opening;
+END_IF;
+
+ELSE  // Fault case
+#io_comm.STS.Step := #c_closing;
+END_CASE;
+END_REGION
+
+REGION Make steps (INT) into Bools
+// Trigger Closed status
+#io_comm.STS.Closed := (#io_comm.STS.Step = #c_closed);
+// Trigger Closing status
+#io_comm.STS.Closing := (#io_comm.STS.Step = #c_closing);
+// Trigger Open status
+#io_comm.STS.Open := (#io_comm.STS.Step = #c_open);
+// Trigger Opening status
+#io_comm.STS.Opening := (#io_comm.STS.Step = #c_opening);
+END_REGION
+END_REGION
+
+REGION Actions
+#Cmd_open := (#io_comm.STS.Open OR #io_comm.STS.Opening);
+END_REGION
+
+REGION Alarms
+REGION Reset alarms
+IF #t_HMI_Reset THEN
+#io_comm.ALM.FBC := 0;
+#io_comm.ALM.FBO := 0;
+#io_comm.ALM.FBI := 0;
+#io_comm.ALM.DCF := 0;
+END_IF;
+END_REGION
+
+REGION Set alarms
+// Fail to close fault
+#s_TIM_Fault_FBC(IN := #io_comm.STS.Closing,
+PT := INT_TO_TIME(#io_comm.PAR.ALM_FBC_del * 1000));
+IF #s_TIM_Fault_FBC.Q THEN
+#io_comm.ALM.FBC := 1;
+END_IF;
+
+// Fail to open fault
+#s_TIM_Fault_FBO(IN := #io_comm.STS.Opening,
+PT := INT_TO_TIME(#io_comm.PAR.ALM_FBO_del * 1000));
+IF #s_TIM_Fault_FBO.Q THEN
+#io_comm.ALM.FBO := 1;
+END_IF;
+
+// Feedback signals invalid fault
+IF (#t_IsClosed AND #t_IsOpen) OR (#io_comm.STS.Closed AND NOT #t_IsClosed) OR (#io_comm.STS.Open AND NOT #t_IsOpen) THEN
+#io_comm.ALM.FBI := 1;
+END_IF;
+
+// Drive circuit fault
+IF NOT #t_IsDriveOK THEN
+#io_comm.ALM.DCF := 1;
+END_IF;
+END_REGION
+
+// Assign Fault status bit
+#io_comm.STS.Fault := #io_comm.ALM.FBC OR #io_comm.ALM.FBO OR #io_comm.ALM.FBI OR #io_comm.ALM.DCF;
+END_REGION

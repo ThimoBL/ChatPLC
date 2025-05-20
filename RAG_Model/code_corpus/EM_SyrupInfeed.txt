@@ -1,0 +1,408 @@
+REGION Components & I/O Declaration
+#InfeedValve(i_fb_Open:=#InfeedValve.i_fb_Open,
+i_fb_Closed:=#InfeedValve.i_fb_Closed,
+o_Open=>#InfeedValve.o_Open,
+io_com:=#InfeedValve_COM);
+
+#Pump(i_Thermal:=#Pump.i_Thermal,
+i_Isolated:=#Pump.i_Isolated,
+i_Running:=#Pump.i_Running,
+o_On=>#Pump.o_On,
+io_com:=#Pump_COM);
+
+#CleaningValve(i_fb_Open:=#CleaningValve.i_fb_Open,
+i_fb_Closed:=#CleaningValve.i_fb_Closed,
+o_Open=>#CleaningValve.o_Open,
+io_com:=#CleaningValve_COM);
+
+#HoseConnector_1(i_DigitalIN:=#HoseConnector_1.i_DigitalIN,
+io_com:=#HoseConnector_1_COM);
+
+#HoseConnector_2(i_DigitalIN:=#HoseConnector_2.i_DigitalIN,
+io_com:=#HoseConnector_2_COM);
+
+#FlowSwitch(i_DigitalIN:=#FlowSwitch.i_DigitalIN,
+io_com:=#FlowSwitch_COM);
+
+#PressureSwitch(i_DigitalIN:=#PressureSwitch.i_DigitalIN,
+io_com:=#PressureSwitch_COM);
+
+#FilterConnector(i_DigitalIN:=#FilterConnector.i_DigitalIN,
+io_com:=#FilterConnector_COM);
+END_REGION
+
+REGION Temp HMI bits
+IF #EM_InFeedSyrup.UDT_EM_InFeedSyrup.HMI.Auto THEN
+#tHMI.Auto := TRUE;
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.HMI.Auto := FALSE;
+END_IF;
+IF #EM_InFeedSyrup.UDT_EM_InFeedSyrup.HMI.Manual THEN
+#tHMI.Manual := TRUE;
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.HMI.Manual := FALSE;
+END_IF;
+IF #EM_InFeedSyrup.UDT_EM_InFeedSyrup.HMI.Cleaning_ON THEN
+#tHMI.Cleaning_ON := TRUE;
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.HMI.Cleaning_ON := FALSE;
+END_IF;
+IF #EM_InFeedSyrup.UDT_EM_InFeedSyrup.HMI.Cleaning_OFF THEN
+#tHMI.Cleaning_OFF := TRUE;
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.HMI.Cleaning_OFF := FALSE;
+END_IF;
+IF #EM_InFeedSyrup.UDT_EM_InFeedSyrup.HMI.Start THEN
+#tHMI.Start := TRUE;
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.HMI.Start := FALSE;
+END_IF;
+IF #EM_InFeedSyrup.UDT_EM_InFeedSyrup.HMI.Stop THEN
+#tHMI.Stop := TRUE;
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.HMI.Stop := FALSE;
+END_IF;
+IF #EM_InFeedSyrup.UDT_EM_InFeedSyrup.HMI.Reset THEN
+#tHMI.Reset := TRUE;
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.HMI.Reset := FALSE;
+END_IF;
+IF #EM_InFeedSyrup.UDT_EM_InFeedSyrup.HMI.SIM_ON THEN
+#tHMI.SIM_ON := TRUE;
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.HMI.SIM_ON := FALSE;
+END_IF;
+IF #EM_InFeedSyrup.UDT_EM_InFeedSyrup.HMI.SIM_OFF THEN
+#tHMI.SIM_OFF := TRUE;
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.HMI.SIM_OFF := FALSE;
+END_IF;
+END_REGION
+
+REGION Automatic/Manual mode
+//Reset all modi signals
+#InfeedValve_COM.CS.Auto := FALSE;
+#Pump_COM.CS.Auto := FALSE;
+#CleaningValve_COM.CS.Auto := FALSE;
+
+#InfeedValve_COM.CS.Manual := FALSE;
+#Pump_COM.CS.Manual := FALSE;
+#CleaningValve_COM.CS.Manual := FALSE;
+
+IF #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.Auto OR #tHMI.Auto AND NOT #EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.InCleaningTHEN
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.InManual := FALSE;
+#InfeedValve_COM.CS.Auto := TRUE;
+#Pump_COM.CS.Auto := TRUE;
+#CleaningValve_COM.CS.Auto := TRUE;
+Totally Integrated
+Automation Portal
+END_IF;
+IF #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.Manual OR #tHMI.Manual THEN
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.InManual := TRUE;
+#InfeedValve_COM.CS.Manual := TRUE;
+#Pump_COM.CS.Manual := TRUE;
+#CleaningValve_COM.CS.Manual := TRUE;
+END_IF;
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.InAuto := NOT #EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.InManual;END_REGION
+
+REGION Simulation
+IF #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.SIM_ON OR #tHMI.SIM_ON THEN
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.InSimulation := TRUE;
+END_IF;
+
+#InfeedValve_COM.CS.Simulation_On := #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.SIM_ON OR #tHMI.SIM_ON;
+#Pump_COM.CS.Simulation_On := #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.SIM_ON OR #tHMI.SIM_ON;
+#CleaningValve_COM.CS.Simulation_On := #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.SIM_ON OR #tHMI.SIM_ON;
+#HoseConnector_1_COM.CS.Simulation_On := #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.SIM_ON OR #tHMI.SIM_ON;
+#HoseConnector_2_COM.CS.Simulation_On := #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.SIM_ON OR #tHMI.SIM_ON;
+#FlowSwitch_COM.CS.Simulation_On := #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.SIM_ON OR #tHMI.SIM_ON;
+#PressureSwitch_COM.CS.Simulation_On := #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.SIM_ON OR #tHMI.SIM_ON;
+#FilterConnector_COM.CS.Simulation_On := #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.SIM_ON OR #tHMI.SIM_ON;
+IF #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.SIM_OFF OR #tHMI.SIM_OFF THEN
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.InSimulation := FALSE;
+END_IF;
+
+#InfeedValve_COM.CS.Simulation_Off := #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.SIM_OFF OR #tHMI.SIM_OFF;
+#Pump_COM.CS.Simulation_Off := #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.SIM_OFF OR #tHMI.SIM_OFF;
+#CleaningValve_COM.CS.Simulation_Off := #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.SIM_OFF OR #tHMI.SIM_OFF;
+#HoseConnector_1_COM.CS.Simulation_Off := #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.SIM_OFF OR #tHMI.SIM_OFF;
+#HoseConnector_2_COM.CS.Simulation_Off := #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.SIM_OFF OR #tHMI.SIM_OFF;
+#FlowSwitch_COM.CS.Simulation_Off := #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.SIM_OFF OR #tHMI.SIM_OFF;
+#PressureSwitch_COM.CS.Simulation_Off := #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.SIM_OFF OR #tHMI.SIM_OFF;
+#FilterConnector_COM.CS.Simulation_Off := #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.SIM_OFF OR #tHMI.SIM_OFF;
+(*//Reset all simulation signals
+#VA1201_COM.CS.Simulation_On := FALSE;
+#VA1201_COM.CS.Simulation_Off := FALSE;
+#P1201_COM.CS.Simulation_On := FALSE;
+#P1201_COM.CS.Simulation_Off := FALSE;
+#VA1202_COM.CS.Simulation_On := FALSE;
+#VA1202_COM.CS.Simulation_Off := FALSE;
+#GS1201_COM.CS.Simulation_On := FALSE;
+#GS1201_COM.CS.Simulation_Off := FALSE;
+#GS1202_COM.CS.Simulation_On := FALSE;
+#GS1202_COM.CS.Simulation_Off := FALSE;
+#FS1203_COM.CS.Simulation_On := FALSE;
+#FS1203_COM.CS.Simulation_Off := FALSE;
+#PS1201_COM.CS.Simulation_On := FALSE;
+#PS1201_COM.CS.Simulation_Off := FALSE;
+#GS1203_COM.CS.Simulation_On := FALSE;
+#GS1203_COM.CS.Simulation_Off := FALSE;
+
+//When simulation is turned on, set all underlying CM's and status EM in simulation
+IF #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.SIM_ON OR #tHMI.SIM_ON OR #EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.InSimulation THEN
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.InSimulation := TRUE;
+#VA1201_COM.CS.Simulation_On := TRUE;
+#P1201_COM.CS.Simulation_On := TRUE;
+#VA1202_COM.CS.Simulation_On := TRUE;
+#GS1201_COM.CS.Simulation_On := TRUE;
+#GS1202_COM.CS.Simulation_On := TRUE;
+#FS1203_COM.CS.Simulation_On := TRUE;
+#PS1201_COM.CS.Simulation_On := TRUE;
+#GS1203_COM.CS.Simulation_On := TRUE;
+END_IF;
+
+//When simulation is turned off, set all underlying CM's off simulation and reset status EM
+IF #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.SIM_OFF OR #tHMI.SIM_OFF THEN
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.InSimulation := FALSE;
+#VA1201_COM.CS.Simulation_Off := TRUE;
+#P1201_COM.CS.Simulation_Off := TRUE;
+#VA1202_COM.CS.Simulation_Off := TRUE;
+#GS1201_COM.CS.Simulation_Off := TRUE;
+#GS1202_COM.CS.Simulation_Off := TRUE;
+#FS1203_COM.CS.Simulation_Off := TRUE;
+#PS1201_COM.CS.Simulation_Off := TRUE;
+#GS1203_COM.CS.Simulation_Off := TRUE;
+END_IF;*)
+END_REGION
+
+REGION Interlock
+//Reset all interlock signals
+#InfeedValve_COM.CS.Interlock := FALSE;
+#Pump_COM.CS.Interlock := FALSE;
+#CleaningValve_COM.CS.Interlock := FALSE;
+Totally Integrated
+Automation Portal
+//Set EM in interlock mode via CS signal
+IF #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.Interlock OR #EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.Interlocked THEN
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.Interlocked := TRUE;
+#InfeedValve_COM.CS.Interlock := TRUE;
+#Pump_COM.CS.Interlock := TRUE;
+#CleaningValve_COM.CS.Interlock := TRUE;
+END_IF;
+
+//Reset interlock mode via CS signal
+IF NOT #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.Interlock THEN
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.Interlocked := FALSE;
+END_IF;
+
+//Interlock modules
+#InfeedValve_COM.CS.Interlock := (#HoseConnector_1_COM.STS.NotSwitched OR #HoseConnector_2_COM.STS.NotSwitched);//Interlock VA1201 when Generic Switch aren't connected (properly)
+#Pump_COM.CS.Interlock := (NOT #InfeedValve_COM.STS.Open OR #FilterConnector_COM.STS.NotSwitched OR#PressureSwitch_COM.STS.Switched) OR (#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.InCleaning AND #CleaningValve_COM.STS.Closed) OR(#EM_InFeedSyrup.UDT_EM_InFeedSyrup.ALM.Flow_Timout); //Interlock P1201 when VA1201 is not open
+#CleaningValve_COM.CS.Interlock := (NOT #EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.InCleaning);//Interlock VA1202 when not in cleaning mode
+END_REGION
+
+REGION Start / Stop Command
+//Prerequisites to start EM
+#StartCommand := ((#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.InAuto AND #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.Start ANDNOT #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.Stop) OR
+(#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.InManual AND #tHMI.Start)) AND
+NOT #EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.InAlarm AND NOT #EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.Interlocked;
+//Prerequisites to stop EM
+#Stopcommand := ((#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.InAuto AND #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.Stop) OR
+(#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.InManual AND #tHMI.Stop)) OR
+(#EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.Start AND #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.Stop) OR
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.InAlarm OR #EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.Interlocked;
+END_REGION
+
+REGION Coordination Control EM
+CASE #EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State_INT OF
+0: //EM is off
+IF #StartCommand THEN //Start command prerequisites
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State_INT := 10; //Switch state to starting
+ELSIF #EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.InManual AND #tHMI.Cleaning_ON THEN //Cleaning modus activated
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State_INT := 40; //Switch state to starting cleaning modus
+END_IF;
+10: //EM is starting
+IF #StartingProcedure.StartingDone THEN //If starting procedure is done
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State_INT := 20; //Switch state to running
+ELSIF #Stopcommand THEN //Stop command prerequisites
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State_INT := 30; //Switch state to stopping
+END_IF;
+20: //EM is running
+IF #Stopcommand THEN //Stop command prerequisites
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State_INT := 30; //Switch state to stopping
+END_IF;
+30: //EM is stopping
+IF #StoppingProcedure.StoppingDone THEN //If stopping procedure is done
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State_INT := 0; //Switch state to off
+ELSIF #StartCommand THEN //Start command prerequisites
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State_INT := 10; //Switch state to starting
+END_IF;
+40: //Start cleaning modus
+IF #StartingCleaningProcedure.StartingCleaningDone THEN //If starting cleaning procedure is done
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State_INT := 50; //Switch state to cleaning active
+ELSIF #EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.InCleaning AND #tHMI.Cleaning_OFF THEN //Stop Cleaning command prerequisites
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State_INT := 60; //Switch state to stopping cleaning modus
+END_IF;
+50: //Cleaning modus active
+IF #EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.InCleaning AND #tHMI.Cleaning_OFF THEN //Stop Cleaning command prerequisites
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State_INT := 60; //Switch state to stopping cleaning modus
+END_IF;
+60: //Stop cleaning modus
+IF #StoppingCleaningProcedure.StoppingCleaningDone THEN //If stopping cleaning procedure is done
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State_INT := 0; //Switch state to off
+ELSIF #EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.InCleaning AND #tHMI.Cleaning_ON THEN //Cleaning modus activated
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State_INT := 40; //Switch state to starting cleaning modus
+END_IF;
+END_CASE;
+END_REGION
+
+REGION Define State EM
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State.Off := (#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State_INT = 0);//EM is off
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State.Starting := (#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State_INT = 10); //EM is starting
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State.Running := (#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State_INT = 20); //EM is running
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State.Stopping := (#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State_INT = 30); //EM is Stopping
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State.StartCleaning := (#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State_INT = 40); //EM is starting cleaning mode
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State.CleaningActive := (#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State_INT = 50); //EM is in cleaning mode
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State.StopCleaning := (#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State_INT = 60);//EM is stopping cleaning mode
+
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.InCleaning := (#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State_INT >= 40AND#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State_INT <= 60);
+
+IF #EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State_INT < 0 OR #EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State_INT > 60THEN
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State_INT := 0;
+END_IF;
+END_REGION
+
+REGION Starting Procedural Control EM
+IF NOT #EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State.Starting THEN
+#StartingProcedure.StartingDone := FALSE;
+#StartingProcedure.StateINT := 0;
+END_IF;
+
+IF #EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State.Starting THEN
+CASE #StartingProcedure.StateINT OF
+0: //Idle
+#StartingProcedure.StateINT := 10;
+10: //Open VA1201
+IF #InfeedValve_COM.STS.Open AND #CleaningValve_COM.STS.Closed THEN
+#StartingProcedure.StateINT := 20;
+END_IF;
+20: //Start P1201
+IF #Pump_COM.STS.On THEN
+#StartingProcedure.StartingDone := TRUE;
+END_IF;
+END_CASE;
+END_IF;
+END_REGION
+
+REGION Stopping Procedural Control EM
+IF NOT #EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State.Stopping THEN
+#StoppingProcedure.StoppingDone := FALSE;
+#StoppingProcedure.StateINT := 0;
+END_IF;
+
+IF #EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State.Stopping THEN
+CASE #StoppingProcedure.StateINT OF
+0: //Idle
+#StoppingProcedure.StateINT := 10;
+
+10: //Stop P1201
+IF #Pump_COM.STS.Off THEN
+#StoppingProcedure.StateINT := 20;
+END_IF;
+20: //Close VA1201
+IF #InfeedValve_COM.STS.Closed AND #InfeedValve_COM.STS.Closed THEN
+#StoppingProcedure.StoppingDone := TRUE;
+END_IF;
+END_CASE;
+END_IF;
+END_REGION
+
+REGION Starting Cleaning Procedural Control EM
+IF NOT #EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State.StartCleaning THEN
+#StartingCleaningProcedure.StartingCleaningDone := FALSE;
+#StartingCleaningProcedure.StateINT := 0;
+END_IF;
+
+IF #EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State.StartCleaning THEN
+CASE #StartingCleaningProcedure.StateINT OF
+0: //Idle
+#StartingCleaningProcedure.StateINT := 10;
+
+10: //Open VA1201
+IF #InfeedValve_COM.STS.Open THEN
+#StartingCleaningProcedure.StateINT := 20;
+END_IF;
+
+20: //Open VA102
+IF #CleaningValve_COM.STS.Open THEN
+#StartingCleaningProcedure.StateINT := 30;
+END_IF;
+
+30: //Start P1201
+IF #Pump_COM.STS.On THEN
+#StartingCleaningProcedure.StartingCleaningDone := TRUE;
+END_IF;
+END_CASE;
+END_IF;
+END_REGION
+
+REGION Stopping Cleaning Procedural Control EM
+IF NOT #EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State.StopCleaning THEN
+#StoppingCleaningProcedure.StoppingCleaningDone := FALSE;
+#StoppingCleaningProcedure.StateINT := 0;
+END_IF;
+
+IF #EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State.StopCleaning THEN
+CASE #StoppingCleaningProcedure.StateINT OF
+0: //Idle
+#StoppingCleaningProcedure.StateINT := 10;
+
+10: //Stop P1201
+IF #Pump_COM.STS.Off THEN
+#StoppingCleaningProcedure.StateINT := 20;
+END_IF;
+
+20: //Close VA1202
+IF #CleaningValve_COM.STS.Closed THEN
+#StoppingCleaningProcedure.StateINT := 30;
+END_IF;
+
+30: //Close VA1201
+IF #InfeedValve_COM.STS.Closed THEN
+#StoppingCleaningProcedure.StoppingCleaningDone := TRUE;
+END_IF;
+END_CASE;
+END_IF;
+END_REGION
+
+REGION Set CS Signals for CM's
+#InfeedValve_COM.CS.Open := (#StartingProcedure.StateINT = 10) OR (#StartingCleaningProcedure.StateINT = 10);
+#CleaningValve_COM.CS.Open := (#StartingCleaningProcedure.StateINT = 20);
+#Pump_COM.CS.On := (#StartingProcedure.StateINT >= 20) OR (#StartingCleaningProcedure.StateINT >= 30) OR (#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.State_INT = 20);
+
+#InfeedValve_COM.CS.Close := (#StoppingProcedure.StateINT = 20) OR (#StoppingCleaningProcedure.StateINT = 30);
+#CleaningValve_COM.CS.Close := (#StoppingCleaningProcedure.StateINT = 20);
+END_REGION
+
+REGION Set Alarms
+//Trigger EM alarm when VA1201, P1201, VA1202, GS1201, GS1202, FS1203, PS1201 or GS1203 has an active alarm
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.STS.InAlarm := (#InfeedValve_COM.STS.InAlarm OR
+#Pump_COM.STS.InAlarm OR
+#CleaningValve_COM.STS.InAlarm OR
+#HoseConnector_1_COM.STS.InAlarm OR
+#HoseConnector_2_COM.STS.InAlarm OR
+#FlowSwitch_COM.STS.InAlarm OR
+#PressureSwitch_COM.STS.InAlarm OR
+#FilterConnector_COM.STS.InAlarm);
+
+"TON_Flow_Timeout".TON(IN:= #Pump_COM.STS.On AND #FlowSwitch_COM.STS.NotSwitched,
+PT:= #EM_InFeedSyrup.UDT_EM_InFeedSyrup.PAR.TIM_FlowDetect);
+IF "TON_Flow_Timeout".Q THEN
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.ALM.Flow_Timout := TRUE;
+END_IF;
+END_REGION
+
+REGION Reset Alarms
+#InfeedValve_COM.CS.Reset := #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.Reset OR #tHMI.Reset;
+#Pump_COM.CS.Reset := #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.Reset OR #tHMI.Reset;
+#CleaningValve_COM.CS.Reset := #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.Reset OR #tHMI.Reset;
+#HoseConnector_1_COM.CS.Reset := #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.Reset OR #tHMI.Reset;
+#HoseConnector_2_COM.CS.Reset := #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.Reset OR #tHMI.Reset;
+#FlowSwitch_COM.CS.Reset := #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.Reset OR #tHMI.Reset;
+#PressureSwitch_COM.CS.Reset := #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.Reset OR #tHMI.Reset;
+#FilterConnector_COM.CS.Reset := #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.Reset OR #tHMI.Reset;
+IF #EM_InFeedSyrup.UDT_EM_InFeedSyrup.CS.Reset OR #tHMI.Reset THEN
+#EM_InFeedSyrup.UDT_EM_InFeedSyrup.ALM.Flow_Timout := FALSE;
+END_IF;
+END_REGION
