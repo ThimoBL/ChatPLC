@@ -5,37 +5,37 @@ namespace ChatPLC_Backend.Models;
 public class AnthropicApiMessage
 {
     [JsonPropertyName("id")]
-    public string Id { get; set; }
+    public string Id { get; set; } = null!;
 
     [JsonPropertyName("type")]
-    public string Type { get; set; }
+    public string Type { get; set; } = null!;
 
     [JsonPropertyName("role")]
-    public string Role { get; set; }
+    public string Role { get; set; } = null!;
 
     [JsonPropertyName("model")]
-    public string Model { get; set; }
+    public string Model { get; set; } = null!;
 
     [JsonPropertyName("content")]
-    public List<ContentItem> Content { get; set; }
+    public List<ContentItem> Content { get; set; } = null!;
 
     [JsonPropertyName("stop_reason")]
-    public string StopReason { get; set; }
+    public string StopReason { get; set; } = null!;
 
     [JsonPropertyName("stop_sequence")]
-    public string StopSequence { get; set; }
+    public string StopSequence { get; set; } = null!;
 
     [JsonPropertyName("usage")]
-    public Usage Usage { get; set; }
+    public Usage Usage { get; set; } = null!;
 }
 
 public class ContentItem
 {
     [JsonPropertyName("type")]
-    public string Type { get; set; }
+    public string Type { get; set; } = null!;
 
     [JsonPropertyName("text")]
-    public string Text { get; set; }
+    public string Text { get; set; } = null!;
 }
 
 public class Usage

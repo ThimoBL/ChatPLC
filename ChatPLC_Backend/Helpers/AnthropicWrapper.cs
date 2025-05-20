@@ -7,7 +7,6 @@ namespace ChatPLC_Backend.Helpers;
 
 public class AnthropicWrapper : IAnthropicWrapper
 {
-    private readonly IConfiguration _configuration;
     private readonly ILogger<AnthropicWrapper> _logger;
     private readonly HttpClient _httpClient;
 
@@ -15,11 +14,10 @@ public class AnthropicWrapper : IAnthropicWrapper
 
     private readonly Dictionary<string, string> _apiHeader;
 
-    public AnthropicWrapper(ILogger<AnthropicWrapper> logger, HttpClient httpClient, IConfiguration configuration)
+    public AnthropicWrapper(ILogger<AnthropicWrapper> logger, HttpClient httpClient)
     {
         _logger = logger;
         _httpClient = httpClient;
-        _configuration = configuration;
         
         // Initialize the API headers
         _apiHeader = new()
