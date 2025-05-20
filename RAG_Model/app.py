@@ -1,5 +1,7 @@
 # Import necessary libraries
 import json
+import os
+from dotenv import load_dotenv
 
 import voyageai
 from qdrant_client import QdrantClient
@@ -8,6 +10,8 @@ from flask import Flask, jsonify, request
 # Import custom classes
 from embeddingService import EmbeddingService
 
+load_dotenv()
+
 app = Flask(__name__)
 
 # Configure Swagger UI
@@ -15,7 +19,7 @@ app = Flask(__name__)
 
 # Initialize Qdrant and VoyageAI clients
 qdrant_client = QdrantClient(host="localhost", port=6333)
-voyage_client = voyageai.Client(api_key="pa-7u2-U9HiABIlImigGR2MzoQ2hZAPNVhFh56xgwKg-je")
+voyage_client = voyageai.Client(api_key=os.getenv("VOYAGE_API_KEY"))
 
 # Initialize Services
 embeddingService = EmbeddingService(qdrant_client = qdrant_client, voyage_client = voyage_client)
