@@ -21,7 +21,7 @@ jobs:
       with:
         dotnet-version: 9.0.x
     - name: Restore dependencies
-      run: dotnet restore /ChatPLC_Backend/ChatPLC_Backend.sln
+      run: dotnet restore ChatPLC_Backend/ChatPLC_Backend.csproj
     - name: Build
       working-directory: ChatPLC_Backend
       run: dotnet build --no-restore ChatPLC_Backend.sln
