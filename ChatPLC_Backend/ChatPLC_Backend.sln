@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IdentityServer", "..\Identi
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "React.BFF", "..\React.BFF\React.BFF.csproj", "{AF0E5F1D-5170-4BB5-BA50-2A261E6D8BC2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChatPLC_Tests", "..\ChatPLC_Tests\ChatPLC_Tests.csproj", "{A5646A60-3299-4AD5-8E5E-1196B5244ECE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{AF0E5F1D-5170-4BB5-BA50-2A261E6D8BC2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AF0E5F1D-5170-4BB5-BA50-2A261E6D8BC2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AF0E5F1D-5170-4BB5-BA50-2A261E6D8BC2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A5646A60-3299-4AD5-8E5E-1196B5244ECE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A5646A60-3299-4AD5-8E5E-1196B5244ECE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A5646A60-3299-4AD5-8E5E-1196B5244ECE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A5646A60-3299-4AD5-8E5E-1196B5244ECE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
