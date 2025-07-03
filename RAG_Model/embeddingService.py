@@ -33,16 +33,16 @@ class EmbeddingService:
 
         # Upload data to collection
         # ToDo: refactor this so it wont treat document as array
-        self.qdrant_client.upload_points(
+        self.qdrant_client.upload_collection(
             collection_name="text_collection",
-            points=[
-                models.PointStruct(
-                    id=idx,
-                    vector=doc_embed,
-                    payload=document
-                )
-                for idx, document in enumerate([document])
+            payload=[
+                {"document": document}]
+            ,
+            vectors=[
+                doc_embed
             ],
+            parallel=2,
+            max_retries=3
         )
 
     # Retrieve document using voyage-code-3 from the vector store:
@@ -57,7 +57,7 @@ class EmbeddingService:
             limit=2,  # Return the top 3 most similar documents
             with_payload=True,  # Include the payload in the result
             score_threshold=0.6,  # Set a score threshold for filtering results
-            ).points
+        ).points
 
         # Return the most similar 3 documents
         return search_result

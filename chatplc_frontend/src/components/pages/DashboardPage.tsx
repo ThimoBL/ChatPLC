@@ -1,15 +1,17 @@
 import Searchbar from "../partial/Searchbar";
 import {useState} from "react";
-import {Alert, Grid} from "@mui/material";
+import {Alert, Button, Grid} from "@mui/material";
 import CodeResponseCanvas from "../partial/CodeResponseCanvas";
-import {fetchPlcCodeJson} from "../../api/ChatPLC_BackendAPI";
+import {AcceptCode, fetchPlcCodeJson} from "../../api/ChatPLC_BackendAPI";
 import axios from "axios";
 import {ApiResult} from "../../models/ApiResult";
 import {useAuth} from "../providers/AuthProvider";
+import {toast, ToastContainer} from "react-toastify";
 
 export default function DashboardPage() {
     const {isAuthenticated} = useAuth();
 
+    const [isAccepting, setIsAccepting] = useState(false);
     const [loading, setLoading] = useState(false);
     const [question, setQuestion] = useState('');
     const [codeResponses, setCodeResponses] = useState<ApiResult[]>([]);
@@ -23,9 +25,9 @@ export default function DashboardPage() {
             setLoading(true);
 
             const requests = [
-                await fetchPlcCodeJson(question),
-                await fetchPlcCodeJson(question),
-                await fetchPlcCodeJson(question)
+                fetchPlcCodeJson(question),
+                fetchPlcCodeJson(question),
+                fetchPlcCodeJson(question)
             ];
 
             await axios.all(requests)
@@ -42,30 +44,92 @@ export default function DashboardPage() {
 
     if (!isAuthenticated) {
         return (
-            <div style={{height: '100%', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
+            <div style={{
+                height: '100%',
+                width: '100%',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center'
+            }}>
                 <Alert variant="outlined" severity="warning">You need to be logged in before you can use the question
                     feature</Alert>
             </div>
         );
     }
 
+    const onClickCodeAccept = async (code: string) => {
+        setIsAccepting(true);
+
+        AcceptCode(code)
+            .then((response) => {
+                console.log('Code accepted:', response);
+                toast.success('Code accepted successfully!');
+            })
+            .catch((error) => {
+                console.error('Error accepting code:', error);
+                toast.error('Error accepting code: ' + (error instanceof Error ? error.message : 'Unknown error'));
+            })
+            .finally(() => {
+                setIsAccepting(false);
+                setQuestion('')
+                setCodeResponses([]);
+            });
+    }
+
     return (
         <>
-            <Searchbar
-                loading={loading}
-                question={question}
-                setQuestion={setQuestion}
-                onSubmit={handleSubmit}
+            <ToastContainer
+                autoClose={10000}
+                closeOnClick={true}
+                theme="colored"
             />
+            <Grid container spacing={3} sx={{p: 3}}>
+                <Grid size="grow">
+                </Grid>
+                <Grid size={6}>
+                    <Searchbar
+                        loading={loading}
+                        isAccepting={isAccepting}
+                        question={question}
+                        setQuestion={setQuestion}
+                        onSubmit={handleSubmit}
+                    />
+                </Grid>
+                <Grid size="grow">
+                    {codeResponses.length > 0 && (
+                        <Button
+                            fullWidth
+                            color="primary"
+                            variant="contained"
+                            disabled={isAccepting}
+                            sx={{borderRadius: '25px', height: '100%'}}
+                        >
+                            Upload own code
+                        </Button>
+                    )}
+                </Grid>
+            </Grid>
             <Grid container columnSpacing={{xs: 1, sm: 2, md: 3}} sx={{px: 3, height: '100%'}}>
                 <Grid size={4} sx={{pr: 3, borderRight: '1px solid rgba(255, 255, 255, 0.12)'}}>
-                    <CodeResponseCanvas loading={loading} codeResponse={codeResponses[0]}/>
+                    <CodeResponseCanvas
+                        loading={loading}
+                        isAccepting={isAccepting}
+                        codeResponse={codeResponses[0]}
+                        onClickCodeAccept={onClickCodeAccept}/>
                 </Grid>
                 <Grid size={4} sx={{pr: 3, borderRight: '1px solid rgba(255, 255, 255, 0.12)'}}>
-                    <CodeResponseCanvas loading={loading} codeResponse={codeResponses[1]}/>
+                    <CodeResponseCanvas
+                        loading={loading}
+                        isAccepting={isAccepting}
+                        codeResponse={codeResponses[1]}
+                        onClickCodeAccept={onClickCodeAccept}/>
                 </Grid>
                 <Grid size={4} sx={{pr: 3}}>
-                    <CodeResponseCanvas loading={loading} codeResponse={codeResponses[2]}/>
+                    <CodeResponseCanvas
+                        loading={loading}
+                        isAccepting={isAccepting}
+                        codeResponse={codeResponses[2]}
+                        onClickCodeAccept={onClickCodeAccept}/>
                 </Grid>
             </Grid>
         </>

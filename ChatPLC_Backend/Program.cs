@@ -54,6 +54,7 @@ namespace ChatPLC_Backend
             });
 
             builder.Services.AddScoped<IQuestionService, QuestionService>();
+            builder.Services.AddScoped<IFileService, FileService>();
             builder.Services.AddLogging(config =>
             {
                 config.AddConsole();

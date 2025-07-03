@@ -71,7 +71,7 @@ internal static class HostingExtensions
         app.UseCors("AllowFrontendOrigin");
         
         //ToDo: Dont forget to add urls that need to be proxied to the backend api.
-        app.MapRemoteBffApiEndpoint("/test", "https://localhost:7001/test");
+        app.MapRemoteBffApiEndpoint("/", "https://localhost:7001/");
             // .RequireAccessToken(Duende.Bff.TokenType.User);
 
         app.MapFallbackToFile("/index.html");

@@ -1,3 +1,4 @@
+using ChatPLC_Backend.Models;
 using ChatPLC_Backend.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,33 +9,25 @@ namespace ChatPLC_Backend.Controllers;
 public class FileController : ControllerBase
 {
     private readonly ILogger<FileController> _logger;
+    private readonly IFileService _fileService;
 
-    public FileController(ILogger<FileController> logger)
+    public FileController(ILogger<FileController> logger, IFileService fileService)
     {
         _logger = logger;
+        _fileService = fileService;
     }
 
     [HttpPost("[action]")]
-    public async Task<IActionResult> UploadFile([FromForm] IFormFile file)
+    public async Task<IActionResult> Upload(CodeResponse response)
     {
-        if (file == null || file.Length == 0) return BadRequest("No file uploaded.");
-        
-        // Randomize filename
-        var randomName = Path.GetRandomFileName();
-        
-        var trustedFileName = (randomName.Contains('.') ? randomName[..randomName.IndexOf('.')] : randomName)
-                              + Path.GetExtension(file.FileName);
-        
-        await using var trustedStream = System.IO.File.Create(trustedFileName);
-        
-        await file.CopyToAsync(trustedStream);
-        
-        trustedStream.Close();
+        if (response == null || string.IsNullOrWhiteSpace(response.Code))
+        {
+            _logger.LogWarning("Empty code response received in {MethodName}", nameof(Upload));
+            return BadRequest("Code response cannot be empty.");
+        }
 
-        // var success = await _ragService.SendFileToRagModel(file);
-
-        var success = true;
-
+        var success = await _fileService.SendFileToRagModel(response.Code);
+        
         return success
             ? Ok("File sent to RAG model successfully.")
             : StatusCode(500, "Failed to send file to RAG model.");

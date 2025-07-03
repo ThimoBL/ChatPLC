@@ -5,34 +5,10 @@ import {fetchTestEndpoint} from "../../api/ChatPLC_BackendAPI";
 import {fetchIsUserLoggedIn} from "../../api/AuthService";
 
 export default function TempPage() {
+    const [testConnection, setTestConnection] = useState<string>("");
     const [data, setData] = useState<string>("");
-    let userClaims: any = null;
-
-    function login() {
-        window.location.href = "/bff/login";
-    }
-
-    function logout() {
-        if (userClaims) {
-            const logoutUrl = userClaims.find(
-                (claim: any) => claim.type === "bff:logout_url"
-            ).value;
-            window.location.href = logoutUrl;
-        } else {
-            window.location.href = "/bff/logout";
-        }
-    }
 
     const test = async () => {
-        // let result = await fetchTestEndpoint();
-        //
-        // if (result) {
-        //     console.log("Response from test endpoint:", result);
-        //     setData(result);
-        // } else {
-        //     console.error("Error fetching data");
-        // }
-
         try {
             const myHeaders = new Headers();
             myHeaders.append("X-CSRF", "1");
@@ -44,24 +20,26 @@ export default function TempPage() {
             });
 
             console.log(response.data);
+            setTestConnection(response.data);
         } catch (e) {
             console.log(e)
         }
     }
 
     const getUserClaims = async () => {
-        await fetchIsUserLoggedIn();
+        let response = await fetchIsUserLoggedIn();
+
+        setData(JSON.stringify(response, null, 5));
     }
 
     return (
         <>
-            <h1>Temp Page</h1>
-            <p>This is a temporary page.</p>
+            <h1>Development Page</h1>
+            <p>This is a page for developers only.</p>
             <Button onClick={test} variant="outlined"> Test </Button>
-            <p>{data}</p>
-            <Button onClick={login} variant="outlined"> Login </Button>
-            <Button onClick={logout} variant="outlined"> Logout </Button>
+            <p>{testConnection}</p>
             <Button onClick={getUserClaims} variant="outlined"> Get User Claims </Button>
+            <p><pre>{data}</pre></p>
         </>
     )
 }

@@ -17,7 +17,7 @@ const NAVIGATION: Navigation = [
     },
     {
         segment: 'temp',
-        title: 'Temp',
+        title: 'Developer Tools',
         icon: <HourglassBottomIcon/>,
     }
 ];

@@ -54,6 +54,14 @@ export default defineConfig({
                 target: targetUrl,
                 secure: false
             },
+            '^/question': {
+                target: targetUrl,
+                secure: false
+            },
+            '^/file': {
+                target: targetUrl,
+                secure: false
+            },
             '^/bff': {
                 target: targetUrl,
                 secure: false

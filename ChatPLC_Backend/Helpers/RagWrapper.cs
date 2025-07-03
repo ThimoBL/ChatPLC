@@ -56,36 +56,30 @@ public class RagWrapper : IRagWrapper
         }
     }
     
-    public async Task<bool> SendFileToRagModel(IFormFile file)
+    public async Task<bool> SendFileToRagModel(string code)
     {
         try
         {
-            // Reading and parsing the file
-            _logger.LogInformation($"Sending file: {file.FileName}");
-            if (file.Length == 0)
-            {
-                _logger.LogWarning("File is empty.");
-                return false;
-            }
+            _logger.LogInformation($"Sending code...");
             
             // Create the content to send to the RAG model
-            using var content = new MultipartFormDataContent();
-            await using var fileStream = file.OpenReadStream();
-            using var streamContent = new StreamContent(fileStream);
-            streamContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
-            content.Add(streamContent, "document", file.FileName);
-
-            // Send the file to the RAG model
+            var document = JsonSerializer.Serialize(new { document = code });
+            
+            // Assuming the API expects a JSON object with a "question" field
+            var content = new StringContent(document, Encoding.UTF8, "application/json");
+            
+            // Send the question to the RAG model
             var response = await _httpClient.PostAsync("test_embed_document", content);
 
-            // Check if the response is successful
             if (response.IsSuccessStatusCode)
             {
-                // Return true if document is saved successfully in vector database
-                _logger.LogInformation("File sent to RAG model successfully.");
+                // Read the response content
+                var result = await response.Content.ReadAsStringAsync();
+                _logger.LogInformation($"Response to code successfull: {result}");
+                
                 return true;
             }
-
+            
             // Log the error if the response is not successful
             _logger.LogError($"Error: {response.StatusCode}");
             return false;

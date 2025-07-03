@@ -2,14 +2,21 @@ import {ApiResult} from "../../models/ApiResult";
 import {Prism as SyntaxHighlighter} from "react-syntax-highlighter";
 import {tomorrow} from "react-syntax-highlighter/dist/esm/styles/prism";
 import React from "react";
-import {Box, CircularProgress, Typography} from "@mui/material";
+import {Box, Button, CircularProgress, Typography} from "@mui/material";
 
 interface CodeResponseCanvasProps {
     loading: boolean;
+    isAccepting: boolean;
     codeResponse: ApiResult | null;
+    onClickCodeAccept: (code: string) => void;
 }
 
-export default function CodeResponseCanvas({loading, codeResponse}: CodeResponseCanvasProps) {
+export default function CodeResponseCanvas({
+                                               loading,
+                                               isAccepting,
+                                               codeResponse,
+                                               onClickCodeAccept
+                                           }: CodeResponseCanvasProps) {
     return (
         <>
             {loading ? (
@@ -22,15 +29,37 @@ export default function CodeResponseCanvas({loading, codeResponse}: CodeResponse
             ) : codeResponse && (
                 <Box sx={{whiteSpace: "pre-wrap", p: 2, borderRadius: 2, bgcolor: "background.paper"}}>
                     {codeResponse.IsSuccess ? (
-                        <Box my={2}>
-                            <SyntaxHighlighter
-                                language="pascal"
-                                style={tomorrow}
-                                customStyle={{borderRadius: "0.5rem", padding: "1rem"}}
+                        <>
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                fullWidth
+                                disabled={isAccepting}
+                                onClick={
+                                    () => onClickCodeAccept(codeResponse.Message?.content[0].text ?? "")
+                                }
+                                sx={{
+                                    borderRadius: '25px'
+                                }}
                             >
-                                {codeResponse?.Message?.content[0].text ?? ""}
-                            </SyntaxHighlighter>
-                        </Box>
+                                {
+                                    isAccepting ? (
+                                        <CircularProgress size={24} sx={{color: "white"}}/>
+                                    ) : (
+                                        "Accept Code"
+                                    )
+                                }
+                            </Button>
+                            <Box my={2}>
+                                <SyntaxHighlighter
+                                    language="pascal"
+                                    style={tomorrow}
+                                    customStyle={{borderRadius: "25px", padding: "1rem"}}
+                                >
+                                    {codeResponse?.Message?.content[0].text ?? ""}
+                                </SyntaxHighlighter>
+                            </Box>
+                        </>
                     ) : (
                         <>
                             <Typography variant="body1" color="error">

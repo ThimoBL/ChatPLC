@@ -35,20 +35,24 @@ def test_api():
 
 @app.route('/test_embed_document', methods=['POST'])
 def embed_document():
-    #Get data from application/json
-    request_data = request.get_json()
+    try:
+        #Get data from application/json
+        request_data = request.get_json()
 
-    #get document from request_data
-    document = request_data.get('document')
+        #get document from request_data
+        document = request_data.get('document')
 
-    #print document
-    embeddingService.embed_document(document)
+        #print document
+        embeddingService.embed_document(document)
 
-    #print embedded document
-    print(document)
+        #print embedded document
+        print(document)
 
-    # Return the document as a JSON response
-    return jsonify({"document": document})
+        # Return the document as a JSON response
+        return jsonify({"document": document})
+    except Exception as e:
+        print(f"Error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/test_embed_query', methods=['POST'])
 def embed_query():
